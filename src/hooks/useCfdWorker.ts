@@ -36,6 +36,8 @@ export interface CfdWorkerHandle {
 
 const UI_PERIOD_MS = 80;
 const HISTORY_PERIOD_MS = 33;
+/** Lattice steps ignored after a flow reset (impulsive-start force spike). */
+const HISTORY_SETTLE_STEPS = 500;
 
 /**
  * Owns the CFD worker lifecycle and the buffer ping-pong. Field data stays in
@@ -47,6 +49,8 @@ export function useCfdWorker(grid: GridSize, params: TunnelParams): CfdWorkerHan
   const frameRef = useRef<CfdFrame | null>(null);
   const paramsRef = useRef(params);
   const renderFpsRef = useRef(0);
+  /** True between a flow restart request and the first frame of the new flow. */
+  const historyHoldRef = useRef(false);
   const [history] = useState(() => new HistoryBuffer(1200));
   const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
   const [perf, setPerf] = useState<PerfStats>(EMPTY_PERF);
@@ -112,7 +116,9 @@ export function useCfdWorker(grid: GridSize, params: TunnelParams): CfdWorkerHan
         fpsFrames = 0;
       }
       const running = !paramsRef.current.paused;
-      if (running && msg.telemetry.stable && now - lastHistory >= HISTORY_PERIOD_MS && msg.telemetry.stepCount > 0) {
+      // Frames still in flight from the previous flow must not leak into the new history.
+      if (historyHoldRef.current && msg.telemetry.stepCount <= HISTORY_SETTLE_STEPS) historyHoldRef.current = false;
+      if (running && !historyHoldRef.current && msg.telemetry.stable && now - lastHistory >= HISTORY_PERIOD_MS && msg.telemetry.stepCount > HISTORY_SETTLE_STEPS) {
         lastHistory = now;
         history.push({
           t: (now - sessionStart) / 1000,
@@ -142,14 +148,24 @@ export function useCfdWorker(grid: GridSize, params: TunnelParams): CfdWorkerHan
   }, [grid.nx, grid.ny, history]);
 
   // Push every setup change to the worker.
+  const presetRef = useRef(params.preset);
   useEffect(() => {
     post({ type: 'setParams', params });
-  }, [params, post]);
+    if (presetRef.current !== params.preset) {
+      // A new test article restarts the flow: its history starts from scratch.
+      presetRef.current = params.preset;
+      historyHoldRef.current = true;
+      history.clear();
+    }
+  }, [params, post, history]);
 
   const sendCommand = useCallback(
     (command: TunnelCommand) => {
       post({ type: 'command', command });
-      if (command === 'resetFlow') history.clear();
+      if (command === 'resetFlow') {
+        historyHoldRef.current = true;
+        history.clear();
+      }
     },
     [post, history],
   );

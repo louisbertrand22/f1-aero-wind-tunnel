@@ -9,6 +9,7 @@ import { DEFAULT_PARAMS, PRESETS } from './geometry/presets';
 import { useCfdWorker } from './hooks/useCfdWorker';
 import { DEFAULT_GRID, DEFAULT_VIEW, G0 } from './types';
 import type { Baseline, GridSize, LayerId, TunnelParams, ViewSettings } from './types';
+import { RUN_IN_STEPS } from './workers/protocol';
 
 const LAYER_KEYS: Record<string, LayerId> = {
   Digit1: 'pressure',
@@ -132,6 +133,7 @@ export default function App() {
               view={view}
               params={params}
               status={tunnel.status}
+              runIn={telemetry ? Math.min(1, telemetry.stepCount / RUN_IN_STEPS) : 0}
               onPaint={tunnel.paint}
               onRenderFps={tunnel.reportRenderFps}
             />

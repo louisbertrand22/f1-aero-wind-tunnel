@@ -3,7 +3,7 @@
  *
  * Coordinates: grid units, x downstream, y DOWNWARD (see `src/types.ts`).
  * Cell (i, j) is a lattice node located at the integer point (i, j); the road
- * surface (half-way bounce-back wall) therefore sits at y = ny − 1.5 and a
+ * surface (half-way bounce-back wall) therefore sits at y = ny − 0.5 and a
  * cell is solid when its node lies inside a polygon.
  *
  * Every wing section is built in a local frame (x along the chord, y toward
@@ -328,7 +328,7 @@ function buildFrontWing(input: GeometryInput): GeometryPolygon[] {
   }
 
   // Drop the cascade so its lowest point sits at the requested ride height.
-  const groundY = ny - 1.5;
+  const groundY = ny - 0.5;
   const rideCells = Math.max(MIN_RIDE_CELLS, rideMm / rideMmPerCell('frontWing', nx));
   const b = polygonsBounds(polygons);
   if (b) {
@@ -339,7 +339,17 @@ function buildFrontWing(input: GeometryInput): GeometryPolygon[] {
   return polygons;
 }
 
-/** Flat floor with Venturi inlet, throat and diffuser under a simplified body. */
+/**
+ * Flat floor + diffuser under a wedge body.
+ *
+ * The lattice runs at a reduced Reynolds number, where a long convergent
+ * Venturi inlet cannot be swallowed: the underfloor flow backs up, stagnates
+ * under the inlet ramp and LIFTS the car. What works at this scale is what
+ * worked on the first ground-effect cars: a low splitter lip, a flat floor
+ * sealed by the rolling road, a diffuser pumped by the low base pressure, and
+ * a wedge upper body whose ramp faces the flow. The wake leaves upward
+ * (upwash), the reaction pushes the car down.
+ */
 function buildFloor(input: GeometryInput): GeometryPolygon[] {
   const { nx, ny } = input;
   const spec = PRESETS.floor;
@@ -347,19 +357,20 @@ function buildFloor(input: GeometryInput): GeometryPolygon[] {
   const diffuser = clampToSpec(input.flapAngleDeg, spec.flap) * DEG;
   const rideMm = clampToSpec(input.rideHeightMm, spec.rideHeight);
 
-  const length = 0.56 * nx;
-  const xStart = 0.16 * nx;
-  const groundY = ny - 1.5;
+  const length = 0.5 * nx;
+  const xStart = 0.18 * nx;
+  const groundY = ny - 0.5;
   const rideCells = Math.max(MIN_RIDE_CELLS, rideMm / rideMmPerCell('floor', nx));
   const throatY = groundY - rideCells;
 
-  // Heights below are measured UP from the throat plane, stations are fractions of length.
-  const noseZ = 0.07 * ny; // nose tip height
-  const sInlet = 0.22; // end of the Venturi inlet / start of the flat throat
-  const sDiff = 0.72; // diffuser kick line
-  const blend = 0.06; // curved kick length
-  const sBonnet = 0.3; // end of the rounded nose on the upper surface
-  const sTail = 0.55; // start of the boat-tail
+  // Heights below are measured UP from the floor plane, stations are fractions of length.
+  const lipZ = Math.max(2, 0.018 * ny); // splitter lip: small inlet radius only
+  const noseZ = lipZ + Math.max(3, 0.03 * ny); // top of the rounded nose
+  const sInlet = 0.1; // end of the inlet radius / start of the flat floor
+  const sDiff = 0.58; // diffuser kick line
+  const blend = 0.08; // curved kick length
+  const sNose = 0.05; // end of the nose radius on the upper surface
+  const sDeck = 0.86; // end of the wedge ramp / start of the rear deck
   const tanD = Math.tan(diffuser);
   const diffuserZ = (s: number): number => {
     const x = (s - sDiff) * length;
@@ -367,42 +378,48 @@ function buildFloor(input: GeometryInput): GeometryPolygon[] {
     const xb = blend * length;
     return x < xb ? (tanD * x * x) / (2 * xb) : tanD * (x - 0.5 * xb);
   };
-  const baseZ = Math.max(3, 0.03 * ny); // base thickness at the diffuser exit
-  const exitZ = diffuserZ(1) + baseZ;
-  const topZ = Math.max(0.22 * ny, exitZ);
+  const baseZ = Math.max(4, 0.035 * ny); // minimum base height above the diffuser exit
+  const exitZ = diffuserZ(1);
+  const deckZ = Math.max(0.2 * ny, exitZ + baseZ);
 
   const pts: number[] = [];
   const push = (s: number, z: number): void => {
     pts.push(xStart + s * length, throatY - z);
   };
 
-  // Underside: quarter-ellipse Venturi inlet (vertical tangent at the nose, flat at the throat).
-  const NOSE_N = 18;
+  // Underside: short inlet radius, tangent to the flat floor.
+  const NOSE_N = 10;
   for (let k = 0; k <= NOSE_N; k++) {
     const phi = (0.5 * Math.PI * k) / NOSE_N;
-    push(sInlet * (1 - Math.cos(phi)), noseZ * (1 - Math.sin(phi)));
+    push(sInlet * (1 - Math.cos(phi)), lipZ * (1 - Math.sin(phi)));
   }
-  // Flat throat.
-  const THROAT_N = 6;
-  for (let k = 1; k <= THROAT_N; k++) push(sInlet + ((sDiff - sInlet) * k) / THROAT_N, 0);
-  // Diffuser: curved kick then straight ramp.
+  // Flat floor.
+  const FLOOR_N = 8;
+  for (let k = 1; k <= FLOOR_N; k++) push(sInlet + ((sDiff - sInlet) * k) / FLOOR_N, 0);
+  // Diffuser: curved kick then straight ramp, ending on a sharp exit edge.
   const DIFF_N = 16;
   for (let k = 1; k <= DIFF_N; k++) {
     const s = sDiff + ((1 - sDiff) * k) / DIFF_N;
     push(s, diffuserZ(s));
   }
-  // Upper surface, walked back toward the nose: boat-tail, bonnet plateau, rounded nose.
-  const TAIL_N = 22;
-  for (let k = 0; k <= TAIL_N; k++) {
-    const u = 1 - k / TAIL_N; // 1 at the exit, 0 at the start of the boat-tail
-    // Convex drop (zero slope at the bonnet, steepest at the exit): no dimple once raked.
-    push(sTail + (1 - sTail) * u, topZ + (exitZ - topZ) * Math.pow(u, 1.5));
+  // Blunt base up to the rear deck, then the upper surface walked back to the nose.
+  push(1, deckZ);
+  const DECK_N = 6;
+  for (let k = 1; k <= DECK_N; k++) {
+    // Rear deck: the wedge ramp flattens out smoothly.
+    const u = k / DECK_N;
+    push(1 - (1 - sDeck) * u, deckZ);
   }
-  const ROOF_N = 4;
-  for (let k = 1; k < ROOF_N; k++) push(sTail + ((sBonnet - sTail) * k) / ROOF_N, topZ);
-  for (let k = NOSE_N; k >= 1; k--) {
+  const RAMP_N = 14;
+  for (let k = 1; k <= RAMP_N; k++) {
+    const u = k / RAMP_N; // 0 at the deck, 1 at the nose radius
+    // Ease out of the deck (no crest suction peak), straight ramp below.
+    const drop = u < 0.25 ? 2 * u * u : u - 0.125; // C¹ junction at u = 0.25
+    push(sDeck - (sDeck - sNose) * u, deckZ - ((deckZ - noseZ) * drop) / 0.875);
+  }
+  for (let k = NOSE_N - 1; k >= 1; k--) {
     const phi = (0.5 * Math.PI * k) / NOSE_N;
-    push(sBonnet * (1 - Math.cos(phi)), noseZ + (topZ - noseZ) * Math.sin(phi));
+    push(sNose * (1 - Math.cos(phi)), lipZ + (noseZ - lipZ) * Math.sin(phi));
   }
 
   // Rake: pitch nose-down about the diffuser kick line, then restore the minimum clearance.

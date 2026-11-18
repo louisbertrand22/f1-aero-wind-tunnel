@@ -53,8 +53,8 @@ export const PRESETS: Record<PresetId, PresetSpec> = {
     spanM: 1.05,
     k3d: 0.72,
     rideMmPerCell400: 5,
-    aoa: { label: 'Incidence plan principal', unit: '°', min: 0, max: 24, step: 0.5, default: 10 },
-    flap: { label: 'Incidence volet', unit: '°', min: 10, max: 55, step: 0.5, default: 36 },
+    aoa: { label: 'Incidence plan principal', unit: '°', min: 0, max: 24, step: 0.5, default: 6 },
+    flap: { label: 'Incidence volet', unit: '°', min: 10, max: 55, step: 0.5, default: 30 },
     rideHeight: null,
     drs: true,
     movingGroundDefault: false,
@@ -80,11 +80,11 @@ export const PRESETS: Record<PresetId, PresetSpec> = {
     id: 'floor',
     label: 'Fond plat & diffuseur Venturi',
     shortLabel: 'Fond plat',
-    description: 'Tunnel Venturi complet : entrée, col et diffuseur, sol défilant à la vitesse de la voiture.',
+    description: 'Fond plat scellé par le tapis roulant, diffuseur Venturi et carrosserie en coin, sol défilant à la vitesse de la voiture.',
     refLengthM: 3.4,
     spanM: 1.4,
     k3d: 0.45,
-    rideMmPerCell400: 5,
+    rideMmPerCell400: 3,
     aoa: { label: 'Rake (assiette)', unit: '°', min: 0, max: 3, step: 0.1, default: 0.8 },
     flap: { label: 'Angle du diffuseur', unit: '°', min: 4, max: 24, step: 0.5, default: 13 },
     rideHeight: { label: 'Garde au sol', unit: 'mm', min: 25, max: 140, step: 1, default: 55 },
@@ -113,7 +113,7 @@ export const PRESETS: Record<PresetId, PresetSpec> = {
 export const PRESET_ORDER: readonly PresetId[] = ['rearWing', 'frontWing', 'floor', 'freeform'];
 
 export const SPEED_RANGE: RangeSpec = { label: 'Vitesse du flux', unit: 'km/h', min: 100, max: 360, step: 1, default: 250 };
-export const VISCOSITY_RANGE: RangeSpec = { label: 'Viscosité cinématique ν', unit: '×10⁻⁵ m²/s', min: 0.5, max: 6, step: 0.05, default: 1.5 };
+export const VISCOSITY_RANGE: RangeSpec = { label: 'Viscosité cinématique ν', unit: '×10⁻⁵ m²/s', min: 1, max: 8, step: 0.05, default: 1.5 };
 export const SUBSTEP_RANGE: RangeSpec = { label: 'Sous-pas / image', unit: '', min: 1, max: 24, step: 1, default: 8 };
 export const DIRTY_AIR_GAP_RANGE: RangeSpec = { label: 'Écart voiture de tête', unit: 's', min: 0.5, max: 3, step: 0.1, default: 1.5 };
 

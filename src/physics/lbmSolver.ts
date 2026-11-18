@@ -67,20 +67,22 @@ const RHO_MIN = 0.5;
 const RHO_MAX = 2.0;
 
 /** Sponge layer in front of the outlet. */
-const SPONGE_COLUMNS = 24;
-const SPONGE_TAU_BOOST = 1.0;
+const SPONGE_COLUMNS = 32;
+const SPONGE_TAU_BOOST = 1.5;
 
 /** Lattice speed of sound. */
 const CS = Math.sqrt(1 / 3);
 /** Per-step relaxation of the outlet density toward 1 (soft pressure anchor). */
-const OUTLET_RELAX = Number(process.env.OR ?? 0.004);
+const OUTLET_RELAX = 0.004;
+/** Convection speed of the outlet extrapolation (between wake and acoustic speeds). */
+const OUTLET_CONVECTION = 0.3;
 /** Per-step relaxation of the inlet reference density toward the inlet mean. */
-const INLET_RELAX = Number(process.env.IR ?? 1 / 2500);
+const INLET_RELAX = 1 / 2500;
 
 /** Cell classification for the hot loop. */
 const FLAG_FAST = 0; // interior fluid, no wall in the stencil
 const FLAG_SOLID = 1;
-const FLAG_SLOW = 2; // fluid touching a body, the roof or the road
+const FLAG_SLOW = 2; // fluid touching a body, the roof or the road (generic path, fields always written)
 
 /** Synthetic dirty-air modes. */
 const DIRTY_MODES = 10;
@@ -341,7 +343,10 @@ export class LbmSolver {
 
   /** Advance `count` full steps (stream, collide, boundaries, loads). */
   step(count = 1): void {
-    for (let n = 0; n < count; n++) this.stepOnce();
+    // Interior macroscopic fields are only needed by the caller, so they are
+    // written on the last sub-step; wall-adjacent cells always refresh theirs
+    // (the boundary conditions read them).
+    for (let n = 0; n < count; n++) this.stepOnce(n === count - 1);
   }
 
   /** Mean aerodynamic load since the previous call; resets the accumulators. */
@@ -424,7 +429,8 @@ export class LbmSolver {
       const edgeRow = j === 0 || j === ny - 1;
       for (let i = 0; i < nx; i++) {
         const x = row + i;
-        flags[x] = solid[x] !== 0 ? FLAG_SOLID : edgeRow ? FLAG_SLOW : FLAG_FAST;
+        // Column 1 feeds the characteristic inlet: keep its fields fresh too.
+        flags[x] = solid[x] !== 0 ? FLAG_SOLID : edgeRow || i === 1 ? FLAG_SLOW : FLAG_FAST;
       }
     }
     for (let j = 0; j < ny; j++) {
@@ -551,7 +557,7 @@ export class LbmSolver {
     this.accYFx += yFxAcc;
   }
 
-  private stepOnce(): void {
+  private stepOnce(writeFields: boolean): void {
     this.updateInletProfile();
 
     const nx = this.nx;
@@ -684,9 +690,11 @@ export class LbmSolver {
         g8[x] = keep * a8 + r2 * (c + dm3 + dmm);
         g6[x] = keep * a6 + r2 * (c - dm3 + dmm);
 
-        rho[x] = r;
-        ux[x] = vx;
-        uy[x] = vy;
+        if (writeFields || flag !== FLAG_FAST) {
+          rho[x] = r;
+          ux[x] = vx;
+          uy[x] = vy;
+        }
       }
     }
 
@@ -696,13 +704,13 @@ export class LbmSolver {
     // so pressure waves running upstream leave instead of bouncing back. ρ̄
     // follows the mean inlet density slowly, which pins the time-averaged
     // inlet velocity to the target.
-    // Outlet — convective extrapolation at the acoustic speed, softly relaxed
+    // Outlet — convective extrapolation, softly relaxed
     // toward ρ = 1 to anchor the pressure level without reflecting.
     const inU = this.inU;
     const inV = this.inV;
     const rbar = this.rhoInlet;
     const invRbar = 1 / rbar;
-    const lam = CS + this.u0;
+    const lam = OUTLET_CONVECTION;
     const cA = 1 / (1 + lam);
     const cB = lam * cA;
     let sumRin = 0;

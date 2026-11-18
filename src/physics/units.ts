@@ -20,9 +20,9 @@ export function latticeVelocity(speedKmh: number): number {
   return 0.035 + 0.05 * Math.min(1, Math.max(0, t));
 }
 
-/** Lattice kinematic viscosity for a physical ν given in 1e-5 m²/s (1.5 → 0.006). */
+/** Lattice kinematic viscosity for a physical ν given in 1e-5 m²/s (1.5 → 0.0033). */
 export function latticeViscosity(viscosity: number): number {
-  return Math.min(0.05, Math.max(0.002, 0.004 * viscosity));
+  return Math.min(0.05, Math.max(0.002, 0.0022 * viscosity));
 }
 
 /** Wake intensity (0 – 1) felt at a given time gap behind another car. */
@@ -131,7 +131,8 @@ export class ForceFilter {
       downforceN,
       downforceKgf: downforceN / G0,
       dragN,
-      ld: Math.abs(dragN) > 1e-6 ? downforceN / dragN : 0,
+      // Efficiency is meaningless while drag crosses zero during transients.
+      ld: cd > 0.02 ? Math.min(99, Math.max(-99, cl / cd)) : 0,
       cl,
       cd,
       copX,

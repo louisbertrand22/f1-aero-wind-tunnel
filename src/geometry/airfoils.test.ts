@@ -203,8 +203,8 @@ describe('buildGeometry', () => {
             expect(ny - 2 - mb.y1, tag).toBeGreaterThanOrEqual(3);
             // …and the requested clearance is honoured to within a cell.
             const want = Math.max(3, setup.rideHeightMm / rideMmPerCell(preset, nx));
-            expect(ny - 1.5 - b.y1, tag).toBeGreaterThan(want - 0.01);
-            expect(ny - 1.5 - b.y1, tag).toBeLessThan(want + 1);
+            expect(ny - 0.5 - b.y1, tag).toBeGreaterThan(want - 0.01);
+            expect(ny - 0.5 - b.y1, tag).toBeLessThan(want + 1);
           }
         }
       });
@@ -288,7 +288,7 @@ describe('buildGeometry', () => {
       const mask = rasterize(g.polygons, nx, ny);
       const b = maskBounds(mask, nx, ny)!;
       const lowest = (i: number): number => {
-        for (let j = ny - 1; j >= 0; j--) if (mask[i + j * nx] === 1) return ny - 1.5 - j;
+        for (let j = ny - 1; j >= 0; j--) if (mask[i + j * nx] === 1) return ny - 0.5 - j;
         return NaN;
       };
       return { front: lowest(Math.round(b.x0 + 0.35 * (b.x1 - b.x0))), rear: lowest(b.x1 - 2) };

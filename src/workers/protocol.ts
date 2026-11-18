@@ -34,6 +34,14 @@ export interface GeometryOutline {
   movable: boolean;
 }
 
+/**
+ * Lattice steps of run-in after a flow reset. The impulsive start sends
+ * pressure waves through the tunnel; until they have left, the Cp map and the
+ * forces are not representative. The worker steps faster during this phase
+ * and the UI flags it.
+ */
+export const RUN_IN_STEPS = 3000;
+
 export type MainToWorker =
   | { type: 'init'; nx: number; ny: number; params: TunnelParams }
   | { type: 'setParams'; params: TunnelParams }

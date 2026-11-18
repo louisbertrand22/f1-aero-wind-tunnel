@@ -132,7 +132,9 @@ export const VORTICITY_MAP = buildColorMap([
 ]);
 
 /** Carbon tone used for solid bodies. */
-export const SOLID_RGB: readonly [number, number, number] = [27, 31, 37];
+export const SOLID_RGB: readonly [number, number, number] = [30, 35, 42];
+/** Rim light drawn on the outer edge of rasterised bodies. */
+export const EDGE_RGB: readonly [number, number, number] = [138, 148, 160];
 /** Fully saturated flow-vis paint. */
 export const FLOWVIS_RGB: readonly [number, number, number] = [200, 245, 58];
 /** Smoke layer background. */
@@ -171,7 +173,6 @@ export function legendFor(layer: LayerId): LegendSpec | null {
           { at: 0, label: '0' },
           { at: 1 / VELOCITY_RATIO_MAX, label: '1' },
           { at: 2 / VELOCITY_RATIO_MAX, label: '2' },
-          { at: 1, label: VELOCITY_RATIO_MAX.toFixed(1) },
         ],
       };
     case 'vorticity':

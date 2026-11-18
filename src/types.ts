@@ -4,7 +4,9 @@
  *
  * Grid conventions (used everywhere):
  *  - cell (i, j) with i ∈ [0, nx) growing downstream (flow goes +x) and
- *    j ∈ [0, ny) growing DOWNWARD (j = 0 is the tunnel roof, j = ny-1 the road);
+ *    j ∈ [0, ny) growing DOWNWARD (j = 0 runs along the roof, j = ny-1 along the road);
+ *  - cell centres sit at integer coordinates; every row is fluid, the walls lie
+ *    half a cell outside (roof at y = -0.5, road surface at y = ny - 0.5);
  *  - flat index `idx = i + j * nx`;
  *  - lattice units: dx = dt = 1, reference density 1, cs² = 1/3;
  *  - a force with positive `fy` points toward the road → it is DOWNFORCE.

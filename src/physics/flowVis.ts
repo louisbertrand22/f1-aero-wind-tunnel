@@ -18,7 +18,7 @@ export class FlowVisPaint {
   /** Paint thickness per cell in [0, 1]; non-zero only inside the body. */
   readonly paint: Float32Array;
   /** Accumulation rate per lattice step at unit shear (u_wall = u∞). */
-  rate = 0.0009;
+  rate = 0.0006;
 
   constructor(nx: number, ny: number) {
     this.nx = nx;
@@ -93,7 +93,7 @@ export class FlowVisPaint {
         if (paint[r] > m) m = paint[r];
         if (paint[u] > m) m = paint[u];
         if (paint[d] > m) m = paint[d];
-        const soaked = m * 0.72;
+        const soaked = m * 0.62;
         if (soaked > paint[idx]) paint[idx] = soaked;
       }
     }

@@ -6,6 +6,7 @@ import {
   FLOWVIS_RGB,
   PRESSURE_MAP,
   SMOKE_BG_RGB,
+  EDGE_RGB,
   SOLID_RGB,
   VELOCITY_MAP,
   VELOCITY_RATIO_MAX,
@@ -123,6 +124,7 @@ export class FieldRenderer {
     const [sr, sg, sb] = SOLID_RGB;
     const [pr, pg, pb] = FLOWVIS_RGB;
     const solidColor = packRgb(sr, sg, sb);
+    const edgeColor = packRgb(EDGE_RGB[0], EDGE_RGB[1], EDGE_RGB[2]);
     const [br, bg, bb] = SMOKE_BG_RGB;
     const mode = layer === 'pressure' ? 0 : layer === 'velocity' ? 1 : layer === 'vorticity' ? 2 : 3;
 
@@ -151,12 +153,13 @@ export class FieldRenderer {
               const paint = Math.min(1, wa * flowVis[a] + wb * flowVis[b] + wc * flowVis[c] + wd * flowVis[d]);
               if (paint > 0.004) {
                 // Gamma < 1 so thin films are already visible.
-                const k = Math.sqrt(paint);
+                const k = paint ** 0.7;
                 pixels[p] = packRgb((sr + (pr - sr) * k) | 0, (sg + (pg - sg) * k) | 0, (sb + (pb - sb) * k) | 0);
                 continue;
               }
             }
-            pixels[p] = solidColor;
+            // Rim light on the outermost sliver so sculpted bodies read on any layer.
+            pixels[p] = cover < 0.66 ? edgeColor : solidColor;
             continue;
           }
           if (mode !== 1) {
@@ -186,8 +189,9 @@ export class FieldRenderer {
           pixels[p] = velocityLut[t | 0];
         } else if (mode === 2) {
           const wz = (wa * curl[a] + wb * curl[b] + wc * curl[c] + wd * curl[d]) * curlScale;
-          // Signed square-root compression: weak shear layers stay readable.
-          const s = wz < 0 ? -Math.sqrt(-wz) : Math.sqrt(wz);
+          // Soft saturation: linear near zero (numerical noise stays black),
+          // compressive for strong shear layers and vortex cores.
+          const s = (1.3 * wz) / ((wz < 0 ? -wz : wz) + 0.3);
           let t = 127.5 + 127.5 * s;
           t = t < 0 ? 0 : t > 255 ? 255 : t;
           pixels[p] = vorticityLut[t | 0];

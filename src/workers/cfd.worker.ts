@@ -10,11 +10,12 @@
 import { LbmSolver } from '../physics/lbmSolver';
 import { SmokeField } from '../physics/smoke';
 import { FlowVisPaint } from '../physics/flowVis';
+import { smoothFluidScalar } from '../physics/fieldFilters';
 import { ForceFilter, dirtyAirIntensity, latticeVelocity, latticeViscosity } from '../physics/units';
 import { buildGeometry, maskBounds, paintBrush, rasterizePolygons, seedFreeform } from '../geometry/airfoils';
 import { PRESETS } from '../geometry/presets';
 import type { Bounds, PresetId, TunnelCommand, TunnelParams } from '../types';
-import { allocFrameBuffers, frameBuffersMatch, frameTransferList } from './protocol';
+import { RUN_IN_STEPS, allocFrameBuffers, frameBuffersMatch, frameTransferList } from './protocol';
 import type { FrameBuffers, GeometryOutline, MainToWorker, WorkerToMain } from './protocol';
 
 /** Minimal typed view of the dedicated worker global (avoids the WebWorker lib clashing with DOM). */
@@ -32,6 +33,19 @@ const POOL_SIZE = 3;
 const DRS_STROKE_S = 0.32;
 /** Lattice steps over which the inlet speed relaxes toward its target. */
 const INLET_RAMP_STEPS = 260;
+/**
+ * During the run-in (see RUN_IN_STEPS) the worker trades frame rate for steps
+ * — it never blocks the UI thread — so the bench settles about twice as fast.
+ */
+const RUN_IN_BUDGET_MS = 26;
+const RUN_IN_SUBSTEPS = 16;
+/**
+ * A perfectly symmetric bluff body can take tens of thousands of steps to start
+ * shedding. Sculpted bodies get a short burst of free-stream turbulence after
+ * every flow reset to trip the Von Kármán street right away.
+ */
+const TRIP_STEPS = 700;
+const TRIP_INTENSITY = 0.4;
 /** Frames the "unstable" flag stays up after an automatic recovery. */
 const UNSTABLE_HOLD_FRAMES = 90;
 
@@ -226,9 +240,15 @@ function advance(t: Tunnel, p: TunnelParams, dtMs: number): number {
     applyGeometry(t, p);
   }
 
-  const budgetSteps = Math.max(1, Math.floor(STEP_BUDGET_MS / Math.max(0.05, msPerStep)));
-  const target = Math.max(1, Math.min(Math.round(p.substeps), budgetSteps));
+  const runIn = t.solver.stepCount < RUN_IN_STEPS;
+  const budgetMs = runIn ? RUN_IN_BUDGET_MS : STEP_BUDGET_MS;
+  const wanted = runIn ? Math.max(RUN_IN_SUBSTEPS, Math.round(p.substeps)) : Math.round(p.substeps);
+  const budgetSteps = Math.max(1, Math.floor(budgetMs / Math.max(0.05, msPerStep)));
+  const target = Math.max(1, Math.min(wanted, budgetSteps));
   const uTarget = latticeVelocity(p.speedKmh);
+
+  const tripping = spec.paintable && t.solver.stepCount < TRIP_STEPS;
+  t.solver.setDirtyAir(Math.max(dirtyAirIntensity(p.dirtyAir, p.dirtyAirGapS), tripping ? TRIP_INTENSITY : 0));
 
   const t0 = performance.now();
   let done = 0;
@@ -242,7 +262,7 @@ function advance(t: Tunnel, p: TunnelParams, dtMs: number): number {
     }
     t.solver.step(chunk);
     done += chunk;
-    if (performance.now() - t0 > STEP_BUDGET_MS * 1.6) break;
+    if (performance.now() - t0 > budgetMs * 1.6) break;
   }
   const elapsed = performance.now() - t0;
   msPerStep += (elapsed / done - msPerStep) * 0.12;
@@ -271,7 +291,7 @@ function publish(t: Tunnel, p: TunnelParams, substeps: number): void {
   const s = t.solver;
   buffers.ux.set(s.ux);
   buffers.uy.set(s.uy);
-  buffers.rho.set(s.rho);
+  smoothFluidScalar(s.rho, s.solid, t.nx, t.ny, buffers.rho);
   s.computeVorticity(buffers.curl);
   buffers.smoke.set(t.smoke.rgb);
   buffers.flowVis.set(t.flowVis.paint);

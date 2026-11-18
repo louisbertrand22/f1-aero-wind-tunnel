@@ -3,9 +3,9 @@
  *
  * Massless particles are advected through the latest velocity snapshot with a
  * midpoint (RK2) step and drawn as short segments on a persistent, slowly
- * fading layer — the accumulated segments read as streaklines. Seeding is
- * biased toward the inlet so streaks enter with the flow, with a share
- * scattered through the veine to keep recirculation zones populated.
+ * fading layer — the accumulated segments read as streaklines. Particles are
+ * re-seeded across the whole veine (recirculation zones stay populated) with
+ * a share entering at the inlet.
  */
 export class TracerParticles {
   readonly count: number;
@@ -45,7 +45,9 @@ export class TracerParticles {
 
   private spawn(k: number, anywhere: boolean): void {
     const { nx, ny } = this;
-    const scatter = anywhere || this.random() < 0.3;
+    // Mostly uniform re-seeding keeps the streak density even along the veine;
+    // the inlet share makes fresh streaks enter with the flow.
+    const scatter = anywhere || this.random() < 0.85;
     const x = scatter ? 1 + this.random() * (nx - 3) : 0.5 + this.random() * 1.5;
     const y = 1 + this.random() * (ny - 3);
     this.x[k] = x;

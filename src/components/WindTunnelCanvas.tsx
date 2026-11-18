@@ -17,6 +17,8 @@ export interface WindTunnelCanvasProps {
   view: ViewSettings;
   params: TunnelParams;
   status: TunnelStatus;
+  /** Run-in progress after a flow reset, 0 – 1 (1 = settled). */
+  runIn: number;
   onPaint: (x0: number, y0: number, x1: number, y1: number, radius: number, erase: boolean) => void;
   onRenderFps: (fps: number) => void;
 }
@@ -109,7 +111,7 @@ function niceLength(maxMeters: number): number {
   return best;
 }
 
-export default function WindTunnelCanvas({ frameRef, grid, view, params, status, onPaint, onRenderFps }: WindTunnelCanvasProps) {
+export default function WindTunnelCanvas({ frameRef, grid, view, params, status, runIn, onPaint, onRenderFps }: WindTunnelCanvasProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const probeBoxRef = useRef<HTMLDivElement | null>(null);
@@ -324,7 +326,7 @@ export default function WindTunnelCanvas({ frameRef, grid, view, params, status,
       set('reynolds', `${fmt2.format((telemetry.reynoldsPhys * ratio) / 1e6)} ×10⁶`);
       set('angle', ratio > 0.03 ? `${signed((Math.atan2(-uy, ux) * 180) / Math.PI, fmt1)}°` : '—');
       const xMm = gx * telemetry.metersPerCell * 1000;
-      const hMm = Math.max(0, ny - 1.5 - gy) * telemetry.metersPerCell * 1000;
+      const hMm = Math.max(0, ny - 0.5 - gy) * telemetry.metersPerCell * 1000;
       set('position', `${fmt0.format(xMm)} · ${fmt0.format(hMm)} mm`);
 
       if (box) {
@@ -609,7 +611,14 @@ export default function WindTunnelCanvas({ frameRef, grid, view, params, status,
         </div>
 
         {/* Bench state chips */}
-        <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1">
+        <div className="pointer-events-none absolute left-3 top-[62px] flex flex-col items-start gap-1">
+          {status === 'running' && runIn < 1 && (
+            <div className="flex items-center gap-2 border border-line-strong bg-carbon-950/85 px-2 py-1 text-flowvis">
+              <Loader2 size={13} strokeWidth={2} className="animate-spin" aria-hidden />
+              <span className="font-cond text-[11px] font-semibold uppercase tracking-[0.12em] text-ink">Mise en régime · ondes de démarrage</span>
+              <span className="num text-[11px] text-ink-dim">{Math.round(runIn * 100)} %</span>
+            </div>
+          )}
           {params.dirtyAir && (
             <div className="flex items-center gap-1.5 border border-warn/60 bg-carbon-950/85 px-2 py-1 text-warn">
               <Wind size={13} strokeWidth={2} aria-hidden />
@@ -632,7 +641,7 @@ export default function WindTunnelCanvas({ frameRef, grid, view, params, status,
 
         {/* Colour legend */}
         {legend && (
-          <div className="pointer-events-none absolute bottom-5 left-3 w-60 bg-carbon-950/85 px-2 pb-1.5 pt-1">
+          <div className="pointer-events-none absolute right-3 top-3 w-60 bg-carbon-950/85 px-2 pb-1.5 pt-1">
             <div className="label-cond mb-1 !text-ink-dim">{legend.title}</div>
             <div className="h-2 w-full border border-line-strong" style={{ background: `linear-gradient(to right, ${legend.css})` }} />
             <div className="relative mt-0.5 h-3.5">
@@ -652,7 +661,7 @@ export default function WindTunnelCanvas({ frameRef, grid, view, params, status,
           </div>
         )}
         {!legend && params.smokeEnabled && (
-          <div className="pointer-events-none absolute bottom-5 left-3 bg-carbon-950/85 px-2 py-1">
+          <div className="pointer-events-none absolute right-3 top-3 bg-carbon-950/85 px-2 py-1">
             <span className="label-cond !text-ink-dim">
               Râteau de {params.smokeNozzles} buse{params.smokeNozzles > 1 ? 's' : ''} · filets de fumée colorés
             </span>
