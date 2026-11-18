@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/*
+ * AeroLab design tokens — "pit-wall instrumentation".
+ * Carbon surfaces, hairline rules, condensed uppercase labels, tabular mono
+ * numerals. One chrome accent: flow-vis fluorescent lime. Data colours are
+ * separate (series-*) and never reused for chrome.
+ */
+@theme {
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-cond: 'Barlow Condensed', 'Barlow', ui-sans-serif, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* surfaces */
+  --color-carbon-950: #07080a;
+  --color-carbon-900: #0c0e11;
+  --color-carbon-850: #111418;
+  --color-carbon-800: #171b20;
+  --color-carbon-700: #1f252c;
+  --color-line: #232a32;
+  --color-line-strong: #36404b;
+
+  /* ink */
+  --color-ink: #e9edf1;
+  --color-ink-dim: #9aa4af;
+  --color-ink-mute: #5f6975;
+
+  /* chrome accent (flow-vis paint) */
+  --color-flowvis: #c8f53a;
+  --color-flowvis-dim: #6f8a1c;
+
+  /* data series (validated categorical trio, dark surface) */
+  --color-series-df: #3987e5;   /* appui / downforce */
+  --color-series-drag: #d95926; /* traînée / drag */
+  --color-series-ld: #199e70;   /* finesse L/D */
+  --color-reference: #b79cff;   /* baseline / run de référence (timing purple) */
+
+  /* status (reserved, always paired with icon + label) */
+  --color-gain: #2fd27a;
+  --color-loss: #ff5a52;
+  --color-warn: #ffb020;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--color-carbon-950);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-flowvis) 35%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-flowvis);
+    outline-offset: 2px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+@layer components {
+  /* Condensed uppercase micro-label used across panels */
+  .label-cond {
+    font-family: var(--font-cond);
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-ink-mute);
+  }
+  /* Tabular numerals for every live value */
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'zero' 1;
+  }
+  .panel {
+    background: var(--color-carbon-900);
+    border: 1px solid var(--color-line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
